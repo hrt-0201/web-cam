@@ -1,234 +1,390 @@
-<!DOCTYPE html>
-<html>
 <head>
-  <meta charset="UTF-8">
-  <title>HTML5 Camera フレーム付き</title>
-  <link rel="stylesheet" href="style.css" type="text/css" media="all">
-  <style>
-    canvas{ border:1px solid gray; }
-    #camera{ position:absolute; z-index:10; }
-    #frame{ position:absolute; z-index:20; }
+    <meta charset="UTF-8">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <title>HTML5 Camera フレーム付き</title>
+    <style>
+    body{ margin: 0; }
+    #camera{ position:absolute; z-index:10; line-height:100%; display: block; width: 100%; height: 100%; }
+    #frame{ position:absolute; z-index:20;}
     #still{ display:none; }
-  </style>
-</head>
-<body>
-
-<h1>フレーム付きカメラ</h1>
-
-<section id="contents">
-  <!-- カメラ映像 -->
-  <video id="camera" width="640" height="480" muted></video>
-
-  <!-- フレーム -->
-  <canvas id="frame" width="640" height="480"></canvas>
-
-  <!-- シャッター -->
-  <div id="shutter-inner">
-    <button id="btn-shutter" type="button"><img src="icon/camera-solid.svg" width="32" height="32"></button>
-  </div>
-
-  <!-- フレーム切り替え -->
-  <div id="frame-inner">
-    <h2>フレーム切り替え</h2>
-    <ul id="framelist">
-    </ul>
-  </div>
-</section>
-
-<!-- 合成用Canvas(不可視) -->
-<canvas id="still" width="640" height="480"></canvas>
-
-<!-- ダイアログ -->
-<div id="dialog-outer">
-  <!-- 最終結果 -->
-  <div id="dialog-result" class="dialog">
-      <img id="dialog-result-close" src="icon/times-circle-regular.svg" width="48" height="48">
-      <p><canvas id="result" width="640" height="480"></canvas></p>
-      <button id="dialog-result-dl" type="button">
-        <img src="icon/download-solid.svg" width="48" height="48">
-      </button>
-  </div>
-
-  <!--  NowLoading -->
-  <div id="dialog-nowloading" class="dialog">
-    ...Now Loading
-  </div>
-</div>
-<!-- /ダイアログ -->
-
-<audio id="se" preload="auto">
-  <source src="se/camera-shutter1.mp3" type="audio/mp3">
-</audio>
-
-<script src="util.js" type="text/javascript"></script>
-<script>
-//-----------------------------------------------------
-// グローバル変数
-//-----------------------------------------------------
-const VIDEO = document.querySelector("#camera");    // <video>
-const FRAME = document.querySelector("#frame");     // <canvas>
-const STILL = document.querySelector("#still");     // <canvas>
-const SE    = document.querySelector('#se');
-
-/** フレーム素材一覧 */
-const FRAMES = [
-    {large:"image/frame1_s.png", small:"image/frame1_s.png"}
-  , {large:"image/frame2_s.png", small:"image/frame2_s.png"}
-  , {large:"image/frame3_s.png", small:"image/frame3_s.png"}
-];
-
-/** カメラ設定 */
-const CONSTRAINTS = {
-  audio: false,
-  video: {
-    width: 640,
-    height: 480,
-    facingMode: "user"   // フロントカメラを利用する
-    // facingMode: { exact: "environment" }  // リアカメラを利用する場合
+    #result{ width: 100%; height: 100%;}
+    /*---------------------------------------*/
+    /* ダイアログ                             */
+    /*---------------------------------------*/
+    #dialog-outer{
+      position: absolute;
+      z-index: 1000;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.6);
+      justify-content: center;
+      align-items: center;
+    }
+    #dialog-result{
+      width: 80%;
+      height: 80%;
+    }
+    #dialog-result-close{
+      cursor: pointer;
+    }
+    #dialog-result-dl{
+      width: 100%;
+      height: 100px;
+    }
+    #dialog-nowloading{
+      width: 400px;
+      height: 120px;
+      font-size: 48px;
+      text-align: center;
+      padding-top: 70px;
+      background-color: rgba(255, 255, 255, 0.8);
+      border-color: lightseagreen;
+    }
+    #btn-shutter{
+      width:100px;
+      height:100px;
+      background:rgb(139 139 138 / 73%);
+      border-radius:100%;
+      border: 15px double ghostwhite;
+      z-index: 999;
+    }
+    #shutter-inner{
+      display: flex;
+      width: 100%;
+      justify-content: center;
+      position: absolute;
+      bottom: 0;
+    }
+    /* カメラ切り替えボタン */
+    #camera-switching{
+      display: flex;
+      width: 100%;
+      justify-content: flex-end;
+      position: absolute;
+      bottom: 0;
+    }
+    #btn-camera{
+      width: 120px;
+      height: 120px;
+      background: rgb(239 239 9 / 73%);
+      border-radius: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 10px;
+      z-index: 999;
+    }
+    #img_switching{
+      width: 100%
+    }
+    .divframe{
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
+    </style>
+  </head>
+  <body>
+    <video id="camera" playsinline autoplay muted></video>
+    <!-- <div class="divframe"> -->
+      <canvas id="frame"></canvas>
+    <!-- </div> -->
+    <!-- シャッター -->
+    <div id="shutter-inner">
+      <div id="btn-shutter"></div>
+    </div>
+    <!-- カメラ切替ボタン -->
+    <div id="camera-switching">
+      <div id="btn-camera"><img id="img_switching" src="image/frame3_s.png"></div>
+    </div>
+    <!-- 合成用Canvas(不可視) -->
+    <canvas id="still"></canvas>
+    <!-- ダイアログ -->
+    <div id="dialog-outer">
+      <!-- 最終結果 -->
+      <div id="dialog-result">
+        <img id="dialog-result-close" src="image/frame3_s.png" width="48" height="48">
+        <p style="margin: 0;"><img id="result_img" src=""><canvas id="result"></canvas></p>
+        <button id="dialog-result-dl" type="button">
+          <img src="image/frame3_s.png" width="48" height="48">
+        </button>
+      </div>
+    </div>
+    <!-- ダイアログ -->
+  </body>
+  <script> 
+  //-----------------------------------------------------
+  // グローバル変数
+  //-----------------------------------------------------
+  const VIDEO = document.querySelector("#camera");    // <video>
+  const FRAME = document.querySelector("#frame");     // <canvas>
+  const STILL = document.querySelector("#still");     // <canvas>
+  const IMGFRAME = "image/moka.png";     // フレーム画像パス
+  var bodysizew = document.body.clientWidth;
+  var bodysizeh = document.body.clientHeight;
+  var rbodysizeh = 0
+  var img = new Image();
+  img.src = IMGFRAME;
+  var cnv = document.querySelector('#frame');
+  var cnvresult = document.querySelector('#result');
+  var cnvstill = document.querySelector('#still');
+  
+  //-----------------------------------------------------
+  // canvasサイズ設定
+  //-----------------------------------------------------
+  img.onload = function() {
+    setCanvasSize()
   }
-};
-
-//-----------------------------------------------------
-// onload
-//-----------------------------------------------------
-window.onload = () => {
-  //-----------------------------
-  //カメラを<video>と同期
-  //-----------------------------
-  syncCamera();
-
-  //-----------------------------
-  // フレーム初期化
-  //-----------------------------
-  drawFrame(FRAMES[0].large);   // 初期フレームを表示
-  setFrameList();               // 切り替え用のフレーム一覧を表示
-
-  //-----------------------------
-  // シャッターボタン
-  //-----------------------------
-  document.querySelector("#btn-shutter").addEventListener("click", ()=>{
-    // SE再生＆映像停止
-    VIDEO.pause();
-    SE.play();
-
-    // 画像の生成
-    onShutter();                                    // カメラ映像から静止画を取得
-    concatCanvas("#result", ["#still", "#frame"]);  // フレームと合成
-
-    // 最終結果ダイアログを表示
-    setTimeout( () => {                // 演出目的で少しタイミングをずらす
-      dialogShow("#dialog-result");
-    }, 300);
-  });
-
-  //-----------------------------
-  // ダイアログ
-  //-----------------------------
-  // 閉じるボタン
-  document.querySelector("#dialog-result-close").addEventListener("click", (e) => {
-    VIDEO.play();
-    dialogHide("#dialog-result");
-  });
-
-  // ダウンロードボタン
-  document.querySelector("#dialog-result-dl").addEventListener("click", (e) => {
-    canvasDownload("#result");
-  });
-};
-
-/**
- * [onload] カメラを<video>と同期
- */
-function syncCamera(){
-  navigator.mediaDevices.getUserMedia(CONSTRAINTS)
-  .then( (stream) => {
-    VIDEO.srcObject = stream;
-    VIDEO.onloadedmetadata = (e) => {
-      VIDEO.play();
-    };
-  })
-  .catch( (err) => {
-    console.log(`${err.name}: ${err.message}`);
-  });
-}
-
-/**
- * [onload] フレーム一覧を表示する
- *
- * @return {void}
- **/
- function setFrameList(){
-  const list = document.querySelector("#framelist");
-  let i=0;
-  FRAMES.forEach(item => {
-    const li = document.createElement("li");
-    li.innerHTML = `<img src="${item.small}">`; // <li><img ...></li>
-    li.classList.add("framelist");              // <li class="framelist" ...
-    li.setAttribute("data-index", i++);         // <li data-index="1" ...
-
-    // クリックされるとフレーム変更
-    li.addEventListener("click", (e)=>{
-      const idx = e.target.parentElement.getAttribute("data-index");    // 親(parent)がli
-      drawFrame(FRAMES[idx].large);
-    })
-
-    // ulに追加
-    list.appendChild(li);
-  });
-}
-
-/**
- * 指定フレームを描画する
- *
- * @param {string} path  フレームの画像URL
- * @return {void}
- */
-function drawFrame(path){
-  const modal = "#dialog-nowloading";
-  const image = new Image();
-  image.src = path;
-  image.onload = () => {
-    const ctx = FRAME.getContext("2d");
-    ctx.clearRect(0, 0, frame.width, frame.height);
-    ctx.drawImage(image, 0, 0, frame.width, frame.height);
-    dialogHide(modal);
+  
+  //-----------------------------------------------------
+  // カメラ初期設定
+  //-----------------------------------------------------
+  var CONSTRAINTS = {
+    audio: false,
+    video: {
+      width: bodysizeh,
+      height: bodysizew,
+      facingMode: { exact: "environment" }
+    }
   };
-  dialogShow(modal);
-}
-
-/**
- * シャッターボタンをクリック
- *
- * @return {void}
- **/
-function onShutter(){
-  const ctx = STILL.getContext("2d");
-  // 前回の結果を消去
-  ctx.clearRect(0, 0, STILL.width, STILL.height);
-
-  // videoを画像として切り取り、canvasに描画
-  ctx.drawImage(VIDEO, 0, 0, STILL.width, STILL.height);
-}
-
-/**
- * ダイアログを表示
- *
- * @param {string} id
- **/
-function dialogShow(id){
-  document.querySelector("#dialog-outer").style.display = "block";
-  document.querySelector(id).style.display = "block";
-}
-
-/**
- * ダイアログを非表示
- *
- * @param {string} id
- **/
- function dialogHide(id){
-  document.querySelector("#dialog-outer").style.display = "none";
-  document.querySelector(id).style.display = "none";
-}
-</script>
-</body>
-</html>
+  
+  //-----------------------------------------------------
+  // onload
+  //-----------------------------------------------------
+  window.onload = () => {
+    //-----------------------------
+    //カメラを<video>と同期
+    //-----------------------------
+    syncCamera();
+    //-----------------------------
+    // フレーム初期化
+    //-----------------------------
+    drawFrame(IMGFRAME);   // 初期フレームを表示
+    //-----------------------------
+    // シャッターボタン
+    //-----------------------------
+    document.querySelector("#btn-shutter").addEventListener("click", ()=>{
+      // 映像停止
+      VIDEO.pause();
+      // 画像の生成
+      onShutter();                                    // カメラ映像から静止画を取得
+      concatCanvas("#result", ["#still", "#frame"]);  // フレームと合成
+      // 最終結果ダイアログを表示
+      setTimeout( () => {                // 演出目的で少しタイミングをずらす
+        dialogShow("#dialog-result");
+      }, 300);
+    });
+  
+    //-----------------------------
+    // ダイアログ
+    //-----------------------------
+    // 閉じるボタン
+    document.querySelector("#dialog-result-close").addEventListener("click", (e) => {
+      VIDEO.play();
+      dialogHide("#dialog-result");
+    });
+    // ダウンロードボタン
+    document.querySelector("#dialog-result-dl").addEventListener("click", (e) => {
+      canvasDownload("#result");
+    });
+    //-----------------------------
+    // カメラ切替
+    //-----------------------------
+    // カメラ切替ボタン
+    document.querySelector("#img_switching").addEventListener("click", (e) => {
+      var fm = CONSTRAINTS.video.facingMode.exact
+      if (fm == "environment") {
+        fm = "user"
+      } else {
+        fm = "environment"
+      }
+      CONSTRAINTS = {
+        audio: false,
+        video: {
+          width: bodysizeh,
+          height: bodysizew,
+          facingMode: { exact: fm }
+        }
+      };
+      //Canvasサイズ設定
+      setCanvasSize()
+      //カメラを<video>と同期
+      syncCamera();
+      // 初期フレームを表示
+      drawFrame(IMGFRAME);
+    });
+  };
+  
+  /**
+   * [onload] カメラを<video>と同期
+   **/
+  function syncCamera(){
+    navigator.mediaDevices.getUserMedia(CONSTRAINTS)
+    .then( (stream) => {
+      VIDEO.srcObject = stream;
+      VIDEO.onloadedmetadata = (e) => {
+        VIDEO.play();
+      };
+    })
+    .catch( (err) => {
+      console.log(`${err.name}: ${err.message}`);
+    });
+  }
+  
+  /**
+   * 指定フレームを描画する
+   *
+   * @param {string} path  フレームの画像URL
+   * @return {void}
+   **/
+  function drawFrame(path){
+    const modal = "#dialog-nowloading";
+    const image = new Image();
+    image.src = path;
+    image.onload = () => {
+      const ctx = FRAME.getContext("2d");
+      ctx.clearRect(0, 0, FRAME.width, FRAME.height);
+      ctx.drawImage(image, 0, 0, FRAME.width, FRAME.height);
+      dialogHide(modal);
+    };
+    dialogShow(modal);
+  }
+  
+  /**
+   * シャッターボタンをクリック
+   *
+   * @return {void}
+   **/
+  function onShutter(){
+    const ctx = STILL.getContext("2d");
+    // 前回の結果を消去
+    ctx.clearRect(0, 0, STILL.width, STILL.height);
+    // videoを画像として切り取り、canvasに描画
+    ctx.drawImage(VIDEO, 0, 0, STILL.width, STILL.height);
+  }
+  
+  /**
+   * ダイアログを表示
+   *
+   * @param {string} id
+   **/
+  function dialogShow(id){
+    // CanvasDataDownload("#result", "mokaframe");
+    document.querySelector("#dialog-outer").style.display = "flex";
+  }
+  
+  /**
+   * ダイアログを非表示
+   *
+   * @param {string} id
+   **/
+  function dialogHide(id){
+    document.querySelector("#dialog-outer").style.display = "none";
+  }
+  
+  /**
+   * Canvas合成
+   *
+   * @param {string} base 合成結果を描画するcanvas(id)
+   * @param {array} asset 合成する素材canvas(id)
+   * @return {void}
+   **/
+  async function concatCanvas(base, asset){
+    var canvas = document.querySelector(base);
+    var ctx = canvas.getContext("2d");
+    for(let i=0; i<asset.length; i++){
+      // FRAMEのサイズ変更
+      if (asset[i] == "#frame") {
+        // var image2 = await getImagefromCanvas(asset[i]);
+        var image2 = new Image();
+        image2.src = IMGFRAME;
+        image2.onload = () => {
+          ctx.drawImage(image2, 0, 0, canvas.width, rbodysizeh);
+        }
+      } else {
+        var image1 = await getImagefromCanvas(asset[i]);
+        ctx.drawImage(image1, 0, 0, canvas.width, canvas.height);
+      }
+    }
+  }
+    
+  /**
+   * Canvasを画像として取得
+   *
+   * @param {string} id  対象canvasのid
+   * @return {object}
+   **/
+  function getImagefromCanvas(id){
+    return new Promise((resolve, reject) => {
+      var image = new Image();
+      var ctx = document.querySelector(id).getContext("2d");
+      image.onload = () => resolve(image);
+      image.onerror = (e) => reject(e);
+      image.src = ctx.canvas.toDataURL();
+    });
+  }
+  
+  
+  /**
+   * Canvasを画像としてダウンロード
+   *
+   * @param {string} id          対象とするcanvasのid
+   * @param {string} [type]      画像フォーマット
+   * @param {string} [filename]  DL時のデフォルトファイル名
+   * @return {void}
+   **/
+  function canvasDownload(id, type="image/png", filename="moka"){
+    var blob = getBlobFromCanvas(id, type);       // canvasをBlobデータとして取得
+    var dataURI = window.URL.createObjectURL(blob);  // Blobデータを「URI」に変換
+    // JS内部でクリックイベントを発動→ダウンロード
+    var event = document.createEvent("MouseEvents");
+    event.initMouseEvent("click", true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+    var a = document.createElementNS("http://www.w3.org/1999/xhtml", "a");
+    a.href = dataURI;         // URI化した画像
+    a.download = filename;    // デフォルトのファイル名 
+    a.dispatchEvent(event);   // イベント発動
+  }
+    
+  /**
+   * 現状のCanvasを画像データとして返却
+   *
+   * @param {string}  id     対象とするcanvasのid
+   * @param {string}  [type] MimeType
+   * @return {blob}
+   **/
+  function getBlobFromCanvas(id, type="image/png"){
+    var canvas = document.querySelector(id);
+    var base64 = canvas.toDataURL(type);              // "data:image/png;base64,iVBORw0k～"
+    var tmp  = base64.split(",");                     // ["data:image/png;base64,", "iVBORw0k～"]
+    var data = atob(tmp[1]);                          // 右側のデータ部分(iVBORw0k～)をデコード
+    var mime = tmp[0].split(":")[1].split(";")[0];    // 画像形式(image/png)を取り出す
+    // Blobのコンストラクタに食わせる値を作成
+    let buff = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      buff[i] = data.charCodeAt(i);
+    }
+    return(
+      new Blob([buff], { type: mime })
+    );
+  }
+  
+  /**
+   * canvasサイズ設定
+   **/
+  function setCanvasSize(){
+    // コンテキストのサイズを画像のサイズに設定
+    // 幅のサイズをブラウザに合わせる
+    cnv.width = bodysizew;
+    // 幅に合わせた場合、何%縮小したのか取得
+    var percentage = bodysizew / img.naturalWidth
+    // ブラウザの幅に合わせて高さ調整
+    rbodysizeh = img.naturalHeight * percentage;
+    cnv.height = rbodysizeh;
+    // #result のサイズ調整
+    cnvresult.width = bodysizew;
+    cnvresult.height = bodysizeh;
+    // #still のサイズ調整
+    cnvstill.width = bodysizew;
+    cnvstill.height = bodysizeh;
+  }
+  </script>

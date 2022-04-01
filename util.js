@@ -10,8 +10,19 @@
     const ctx = canvas.getContext("2d");
   
     for(let i=0; i<asset.length; i++){
-      const image1 = await getImagefromCanvas(asset[i]);
-      ctx.drawImage(image1, 0, 0, canvas.width, canvas.height);
+    //   const image1 = await getImagefromCanvas(asset[i]);
+    //   ctx.drawImage(image1, 0, 0, canvas.width, canvas.height);
+    if (asset[i] == "#frame") {
+        // var image2 = await getImagefromCanvas(asset[i]);
+        var image2 = new Image();
+        image2.src = IMGFRAME;
+        image2.onload = () => {
+          ctx.drawImage(image2, 0, 0, canvas.width, rbodysizeh);
+        }
+      } else {
+        var image1 = await getImagefromCanvas(asset[i]);
+        ctx.drawImage(image1, 0, 0, canvas.width, canvas.height);
+      }
     }
   }
   
